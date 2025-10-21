@@ -22,7 +22,7 @@ jobs:
           cache: maven
 
       - name: Build and test with Maven
-        working-directory: backend
+        working-directory: myapp
         run: |
           if [ -f "./mvnw" ]; then
             ./mvnw -B -ntp clean verify
