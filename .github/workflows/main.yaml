@@ -2,34 +2,30 @@ name: CI devops 2025
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, develop, dev]
   pull_request:
-    branches: [main,  dev]
+    branches: [main, develop, dev]
 
 jobs:
   test-backend:
     runs-on: ubuntu-24.04
 
     steps:
-      # Récupérer le code source du dépôt
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Installer Java 21 (Temurin) avec cache Maven
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
-          cache: 'maven'
+          cache: maven
 
-      # Construire et tester l'application Maven dans le dossier myapp
-      - name: Build without tests (temp)
-        working-directory: myapp
+      - name: Build and test with Maven
+        working-directory: backend
         run: |
           if [ -f "./mvnw" ]; then
-            ./mvnw -B -ntp -DskipTests clean package
+            ./mvnw -B -ntp clean verify
           else
-            mvn -B -ntp -DskipTests clean package
+            mvn -B -ntp clean verify
           fi
-     
