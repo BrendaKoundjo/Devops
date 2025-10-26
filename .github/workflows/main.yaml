@@ -62,7 +62,7 @@ jobs:
           push: true
           tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-backend:latest
 
-      # Garde ou commente ces deux étapes selon ton projet
+      # Garde ou commente ces deux étapes selon ton proje
       - name: Build and push database image
         uses: docker/build-push-action@v6
         with:
