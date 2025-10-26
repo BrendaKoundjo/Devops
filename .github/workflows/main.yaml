@@ -51,8 +51,8 @@ jobs:
       # ✅ Login à Docker Hub (avec secrets)
       - name: Login to DockerHub
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
-            --username "${{ secrets.DOCKERHUB_USERNAME }}" \
+          echo "${{ secrets.coursdevops}}" | docker login \
+            --username "${{ secrets.coursdevops}}" \
             --password-stdin
 
       - name: Build and push backend image
