@@ -32,8 +32,8 @@ jobs:
   build-and-push-docker-image:
     needs: test-backend
     runs-on: ubuntu-24.04
-    # évite de pousser depuis un fork (pas de secrets)
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,29 +41,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Vérification des secrets (debug)
+      - name: Check DockerHub secrets presence
+        run: |
+          test -n "${{ secrets.BRENDAAUDREY_USERNAME }}" || (echo "❌ Missing BRENDAAUDREY_USERNAME" && exit 1)
+          test -n "${{ secrets.BRENDAAUDREY }}" || (echo "❌ Missing BRENDAAUDREY (token)" && exit 1)
+          echo "✅ Secrets detected."
+
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.BRENDAAUDREY_USERNAME }}
+          password: ${{ secrets.BRENDAAUDREY }}
 
-      # ⬇️ BACKEND dans myapp/
       - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
           context: ./myapp
           dockerfile: ./myapp/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-simple-api-backend:latest
+          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-backend:latest
 
-      # Garde ces deux-là si tu as bien ces dossiers/Dockerfile :
+      # Garde ou commente ces deux étapes selon ton projet
       - name: Build and push database image
         uses: docker/build-push-action@v6
         with:
           context: ./database
           dockerfile: ./database/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-simple-api-database:latest
+          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-database:latest
 
       - name: Build and push httpd image
         uses: docker/build-push-action@v6
@@ -71,4 +77,4 @@ jobs:
           context: ./httpd
           dockerfile: ./httpd/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tp-devops-simple-api-httpd:latest
+          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-httpd:latest
