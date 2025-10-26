@@ -1,0 +1,80 @@
+name: CI devops 2025
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build and test with Maven
+        working-directory: myapp
+        run: |
+          if [ -f "./mvnw" ]; then
+            ./mvnw -B -ntp clean verify
+          else
+            mvn -B -ntp clean verify
+          fi
+
+  build-and-push-docker-image:
+    needs: test-backend
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Vérification des secrets (debug)
+      - name: Check DockerHub secrets presence
+        run: |
+          test -n "${{ secrets.BRENDAAUDREY_U }}" || (echo "❌ Missing BRENDAAUDREY_USERNAME" && exit 1)
+          test -n "${{ secrets.BRENDAAUDREY }}" || (echo "❌ Missing BRENDAAUDREY (token)" && exit 1)
+          echo "✅ Secrets detected."
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.BRENDAAUDREY_USERNAME }}
+          password: ${{ secrets.BRENDAAUDREY }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./myapp
+          dockerfile: ./myapp/Dockerfile
+          push: true
+          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-backend:latest
+
+      # Garde ou commente ces deux étapes selon ton projet
+      - name: Build and push database image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./database
+          dockerfile: ./database/Dockerfile
+          push: true
+          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-database:latest
+
+      - name: Build and push httpd image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./httpd
+          dockerfile: ./httpd/Dockerfile
+          push: true
+          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-httpd:latest
