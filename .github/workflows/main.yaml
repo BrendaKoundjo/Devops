@@ -66,8 +66,8 @@ jobs:
       - name: Build and push database image
         uses: docker/build-push-action@v6
         with:
-          context: ./database
-          dockerfile: ./database/Dockerfile
+          context: ./db
+          dockerfile: ./db/Dockerfile
           push: true
           tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-database:latest
 
