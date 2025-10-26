@@ -60,7 +60,7 @@ jobs:
           context: ./myapp
           dockerfile: ./myapp/Dockerfile
           push: true
-          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-backend:latest
+          tags: ${{ secrets.username }}/tp-devops-simple-api-backend:latest
 
       # Garde ou commente ces deux étapes selon ton proje
       - name: Build and push database image
@@ -69,7 +69,7 @@ jobs:
           context: ./db
           dockerfile: ./db/Dockerfile
           push: true
-          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-database:latest
+          tags: ${{ secrets.username}}/tp-devops-simple-api-database:latest
 
       - name: Build and push httpd image
         uses: docker/build-push-action@v6
@@ -77,4 +77,4 @@ jobs:
           context: ./httpd
           dockerfile: ./httpd/Dockerfile
           push: true
-          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-httpd:latest
+          tags: ${{ secrets.username }}/tp-devops-simple-api-httpd:latest
