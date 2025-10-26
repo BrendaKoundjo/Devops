@@ -44,15 +44,15 @@ jobs:
       # Vérification des secrets (debug)
       - name: Check DockerHub secrets presence
         run: |
-          test -n "${{ secrets.BRENDAAUDREY_USERNAME }}" || (echo "❌ Missing BRENDAAUDREY_USERNAME" && exit 1)
-          test -n "${{ secrets.BRENDAAUDREY }}" || (echo "❌ Missing BRENDAAUDREY (token)" && exit 1)
+          test -n "${{ secrets.brendaaudrey  }}" || (echo "❌ Missing BRENDAAUDREY_USERNAME" && exit 1)
+          test -n "${{ secrets.brendaaudrey }}" || (echo "❌ Missing BRENDAAUDREY (token)" && exit 1)
           echo "✅ Secrets detected."
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.BRENDAAUDREY_USERNAME }}
-          password: ${{ secrets.BRENDAAUDREY }}
+          username: ${{ secrets.brendaaudrey }}
+          password: ${{ secrets.brendaaudrey }}
 
       - name: Build and push backend image
         uses: docker/build-push-action@v6
