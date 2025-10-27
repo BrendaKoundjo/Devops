@@ -94,7 +94,7 @@ jobs:
       - name: SonarCloud analysis (debug)
         working-directory: myapp
         env:
-          # Obligatoire : token SonarCloud
+          # Obligatoire token SonarCloud
           SONAR_TOKEN: ${{ secrets.pwdsonar}}
         run: |
           mvn -B -e -X sonar:sonar \
