@@ -97,6 +97,12 @@ jobs:
           # Obligatoire token SonarClouds
           SONAR_TOKEN: ${{ secrets.pwdsonar}}
         run: |
+          set -euo pipefail
+
+          echo "🧱 Compilation du projet avant Sonar..."
+          mvn -B clean verify -DskipTests
+          echo "🔎 Vérification du dossier target/classes :"
+          ls -R target || true
           mvn -B -e -X sonar:sonar \
             -Dsonar.organization=brendakoundjo \
             -Dsonar.projectKey=BrendaKoundjo_Devops \
