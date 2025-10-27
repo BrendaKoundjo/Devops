@@ -21,7 +21,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # Build + tests (avec retry réseau pour Maven Central)
+      # Build + tests (avec retry réseau pour Maven Central
       - name: Build and test with Maven (retry)
         working-directory: myapp
         run: |
@@ -48,7 +48,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.pwdsonar }}
         run: |
           set -euo pipefail
-          # ⚠️ Mets exactement les valeurs de ton organisation/projet SonarCloud
+          # Mets exactement les valeurs de ton organisation/projet SonarCloud
           SONAR_ORG="brendakoundjo"
           SONAR_PROJECT="BrendaKoundjo_Devops"
 
@@ -80,9 +80,9 @@ jobs:
 
       - name: Check DockerHub secrets presence
         run: |
-          test -n "${{ secrets.username }}"    || (echo "❌ Missing Docker username (secrets.username)" && exit 1)
-          test -n "${{ secrets.coursdevops }}" || (echo "❌ Missing Docker token (secrets.coursdevops)" && exit 1)
-          echo "✅ Docker secrets detected."
+          test -n "${{ secrets.username }}"    || (echo "Missing Docker username (secrets.username)" && exit 1)
+          test -n "${{ secrets.coursdevops }}" || (echo "Missing Docker token (secrets.coursdevops)" && exit 1)
+          echo " Docker secrets detected."
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
