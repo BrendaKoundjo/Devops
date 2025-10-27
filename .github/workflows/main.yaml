@@ -9,6 +9,7 @@ on:
 jobs:
   test-backend:
     runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,18 +21,54 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build and test with Maven
+      # Build + tests (avec retry réseau pour Maven Central)
+      - name: Build and test with Maven (retry)
         working-directory: myapp
         run: |
-          if [ -f "./mvnw" ]; then
-            ./mvnw -B -ntp clean verify
-          else
-            mvn -B -ntp clean verify
-          fi
+          set -e
+          for i in 1 2 3; do
+            mvn -B -ntp clean verify \
+              -Dmaven.wagon.http.retryHandler.count=3 \
+              -Dmaven.wagon.http.connectionManager.ttl=60 \
+              -Dmaven.wagon.http.pool=false && break || {
+                echo "⚠️ Maven attempt $i failed; retrying in 10s..."; sleep 10;
+              }
+          done
+
+      # Vérif du token Sonar
+      - name: Check Sonar token presence
+        run: |
+          test -n "${{ secrets.pwdsonar }}" || (echo "❌ Missing Sonar token (secrets.pwdsonar)" && exit 1)
+          echo "✅ SONAR token detected."
+
+      # Analyse SonarCloud (debug)
+      - name: SonarCloud analysis (debug)
+        working-directory: myapp
+        env:
+          SONAR_TOKEN: ${{ secrets.pwdsonar }}
+        run: |
+          set -euo pipefail
+          # ⚠️ Mets exactement les valeurs de ton organisation/projet SonarCloud
+          SONAR_ORG="brendakoundjo"
+          SONAR_PROJECT="BrendaKoundjo_Devops"
+
+          java -version || true
+          mvn -version || true
+
+          # Le bytecode est déjà produit par 'clean verify' ci-dessus
+          mvn -B -e -X sonar:sonar \
+            -Dsonar.organization="$SONAR_ORG" \
+            -Dsonar.projectKey="$SONAR_PROJECT" \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login="$pwdsonar" \
+            -Dsonar.branch.name="${{ github.ref_name }}" \
+            -Dsonar.sources=src/main \
+            -Dsonar.tests=src/test
 
   build-and-push-docker-image:
     needs: test-backend
     runs-on: ubuntu-24.04
+    # Évite de pousser des images depuis une PR de fork (secrets non transmis par GitHub)
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
 
     steps:
@@ -41,75 +78,44 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Vérification des secrets (debug)
       - name: Check DockerHub secrets presence
         run: |
-          test -n "${{ secrets.username }}" || (echo " Missing BRENDAAUDREY_USERNAME" && exit 1)
-          test -n "${{ secrets.coursdevops}}" || (echo " Missing BRENDAAUDREY (token)" && exit 1)
-          echo " Secrets detected"
+          test -n "${{ secrets.username }}"    || (echo "❌ Missing Docker username (secrets.username)" && exit 1)
+          test -n "${{ secrets.coursdevops }}" || (echo "❌ Missing Docker token (secrets.coursdevops)" && exit 1)
+          echo "✅ Docker secrets detected."
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.username }}
-          password: ${{ secrets.coursdevops}}
+          password: ${{ secrets.coursdevops }}
 
+      # Backend image (Dockerfile dans myapp/)
       - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
           context: ./myapp
           dockerfile: ./myapp/Dockerfile
           push: true
+          # ⚠️ le namespace doit être exactement ton username Docker Hub (tout en minuscules)
           tags: ${{ secrets.username }}/tp-devops-simple-api-backend:latest
 
-      # Garde ou commente ces deux étapes selon ton proje
+      # Database image (facultatif, seulement si le Dockerfile existe)
       - name: Build and push database image
+        if: ${{ hashFiles('db/Dockerfile') != '' }}
         uses: docker/build-push-action@v6
         with:
           context: ./db
           dockerfile: ./db/Dockerfile
           push: true
-          tags: ${{ secrets.username}}/tp-devops-simple-api-database:latest
+          tags: ${{ secrets.username }}/tp-devops-simple-api-database:latest
 
+      # HTTPD image (facultatif, seulement si le Dockerfile existe)
       - name: Build and push httpd image
+        if: ${{ hashFiles('httpd/Dockerfile') != '' }}
         uses: docker/build-push-action@v6
         with:
           context: ./httpd
           dockerfile: ./httpd/Dockerfile
           push: true
           tags: ${{ secrets.username }}/tp-devops-simple-api-httpd:latest
-
-       # --- DIAGNOSTIC AVANT SONAR ---
-      - name: Check Sonar secret presence
-        run: |
-          test -n "${{ secrets.pwdsonar}}" || (echo " Missing SONAR_TOKEN (Repository secret)" && exit 1)
-          echo " SONAR_TOKEN is set."
-
-      - name: Print Java & Maven versions
-        run: |
-          java -version
-          mvn -version
-
-      # --- ANALYSE SONARCLOUD (MODE DEBUG) ---
-      - name: SonarCloud analysis (debug)
-        working-directory: myapp
-        env:
-          # Obligatoire token SonarCloud
-          SONAR_TOKEN: ${{ secrets.pwdsonar}}
-        run: |
-          set -euo pipefail
-
-          echo " Compilation du projet avant Sonar..."
-          mvn -B clean verify -DskipTests
-          echo " Vérification du dossier target/classes :"
-          ls -R target || true
-          mvn -B -e -X sonar:sonar \
-            -Dsonar.organization=brendakoundjo \
-            -Dsonar.projectKey=BrendaKoundjo_Devops \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login="$pwdsonar" \
-            -Dsonar.branch.name="${{ github.ref_name }}" \
-            -Dsonar.sources=src/main \
-            -Dsonar.tests=src/test
-
-
