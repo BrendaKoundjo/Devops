@@ -81,7 +81,7 @@ jobs:
             # --- DIAGNOSTIC AVANT SONAR ---
       - name: Check Sonar secret presence
         run: |
-          test -n "${{ secrets.SONAR_TOKEN }}" || (echo "❌ Missing SONAR_TOKEN (Repository secret)" && exit 1)
+          test -n "${{ secrets.pwdsonar }}" || (echo "❌ Missing SONAR_TOKEN (Repository secret)" && exit 1)
           echo "✅ SONAR_TOKEN is set."
 
       - name: Print Java & Maven versions
