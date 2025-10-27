@@ -44,15 +44,15 @@ jobs:
       # Vérification des secrets (debug)
       - name: Check DockerHub secrets presence
         run: |
-          test -n "${{ secrets.BRENDAAUDREY_U }}" || (echo "❌ Missing BRENDAAUDREY_USERNAME" && exit 1)
-          test -n "${{ secrets.BRENDAAUDREY }}" || (echo "❌ Missing BRENDAAUDREY (token)" && exit 1)
-          echo "✅ Secrets detected."
+          test -n "${{ secrets.username }}" || (echo "❌ Missing BRENDAAUDREY_USERNAME" && exit 1)
+          test -n "${{ secrets.coursdevops}}" || (echo "❌ Missing BRENDAAUDREY (token)" && exit 1)
+          echo "✅ Secrets detected"
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.BRENDAAUDREY_USERNAME }}
-          password: ${{ secrets.BRENDAAUDREY }}
+          username: ${{ secrets.username }}
+          password: ${{ secrets.coursdevops}}
 
       - name: Build and push backend image
         uses: docker/build-push-action@v6
@@ -60,16 +60,16 @@ jobs:
           context: ./myapp
           dockerfile: ./myapp/Dockerfile
           push: true
-          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-backend:latest
+          tags: ${{ secrets.username }}/tp-devops-simple-api-backend:latest
 
-      # Garde ou commente ces deux étapes selon ton projet
+      # Garde ou commente ces deux étapes selon ton proje
       - name: Build and push database image
         uses: docker/build-push-action@v6
         with:
-          context: ./database
-          dockerfile: ./database/Dockerfile
+          context: ./db
+          dockerfile: ./db/Dockerfile
           push: true
-          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-database:latest
+          tags: ${{ secrets.username}}/tp-devops-simple-api-database:latest
 
       - name: Build and push httpd image
         uses: docker/build-push-action@v6
@@ -77,4 +77,4 @@ jobs:
           context: ./httpd
           dockerfile: ./httpd/Dockerfile
           push: true
-          tags: ${{ secrets.BRENDAAUDREY_USERNAME }}/tp-devops-simple-api-httpd:latest
+          tags: ${{ secrets.username }}/tp-devops-simple-api-httpd:latest

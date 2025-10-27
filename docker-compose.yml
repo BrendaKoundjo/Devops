@@ -1,0 +1,62 @@
+services:
+  database:
+    build: ./db
+    image: my-db:1.0
+    container_name: db
+    networks: [app]
+    environment:
+      POSTGRES_DB: db
+      POSTGRES_USER: usr
+      POSTGRES_PASSWORD: pwd
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usr -d db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./myapp
+    image: simple-api:1.0
+    container_name: backend
+    networks: [app]
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/db
+      SPRING_DATASOURCE_USERNAME: usr
+      SPRING_DATASOURCE_PASSWORD: pwd
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+    # backend non exposé directement (optionnel)
+    # ports:
+    #   - "8080:8080"
+
+  httpd:
+    build: ./httpd
+    image: my-httpd:1.0
+    container_name: httpd
+    depends_on:
+      - backend
+    networks: [ app ]
+    ports:
+      - "80:80"
+
+  adminer:
+    image: adminer
+    container_name: adminer
+    networks: [app]
+    depends_on:
+      - database
+    ports:
+      - "8090:8080"
+
+networks:
+  app:
+
+volumes:
+  pgdata:
