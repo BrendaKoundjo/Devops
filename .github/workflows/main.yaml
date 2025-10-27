@@ -102,6 +102,6 @@ jobs:
             -Dsonar.projectKey=BrendaKoundjo_Devops \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login="$pwdsonar" \
-            --file ./myapp/pom.xml
+            --file ./pom.xml
 
 
