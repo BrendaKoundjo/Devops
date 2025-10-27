@@ -98,8 +98,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.pwdsonar}}
         run: |
           mvn -B -e -X sonar:sonar \
-            -Dsonar.projectKey=BrendaKoundjoDevopsAdministration_myapp \
-            -Dsonar.organization=brendakoundjodevopsadministration \
+            -Dsonar.organization=BrendaKoundjo \
+            -Dsonar.projectKey=BrendaKoundjo_Devops \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login="$pwdsonar" \
             -Dsonar.sources=src/main \
