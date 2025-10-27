@@ -98,7 +98,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.pwdsonar}}
         run: |
           mvn -B -e -X sonar:sonar \
-            -Dsonar.projectKey=pwdsonar \
+            -Dsonar.projectKey=usrsonar \
             -Dsonar.organization=brendakoundjo \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login="$pwdsonar" \
