@@ -2,9 +2,9 @@ name: CI devops 2025
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, main]
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
 
 jobs:
   test-backend:
