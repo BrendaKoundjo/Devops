@@ -77,12 +77,14 @@ jobs:
           context: ./httpd
           dockerfile: ./httpd/Dockerfile
           push: true
-          tags: ${{ secrets.username }}/tp-devops-simple-api-httpd:latest
-      - name: SonarCloud analysis
-        working-directory: myapp
-        run: |
-          mvn -B verify sonar:sonar \
-            -Dsonar.projectKey=pwdsonar \
-            -Dsonar.organization=usrsonar \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=${{ secrets.pwdsonar}}
+          tags: ${{ secrets.usrsonar }}/tp-devops-simple-api-httpd:latest
+      - name: SonarCloud Scan (official action)
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.pwdsonar}}
+        with:
+          projectBaseDir: myapp
+          args: >
+            -Dsonar.projectKey=pwdsonar
+            -Dsonar.organization=pwdsonar
+
