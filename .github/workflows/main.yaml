@@ -77,14 +77,4 @@ jobs:
           context: ./httpd
           dockerfile: ./httpd/Dockerfile
           push: true
-          tags: ${{ secrets.usrsonar }}/tp-devops-simple-api-httpd:latest
-            # --- DIAGNOSTIC AVANT SONAR ---
-      - name: Check Sonar secret presence
-        run: |
-          test -n "${{ secrets.pwdsonar }}" || (echo "❌ Missing SONAR_TOKEN (Repository secret)" && exit 1)
-          echo "✅ SONAR_TOKEN is set."
-
-      - name: Print Java & Maven versions
-        run: |
-          java -version
-          mvn -version
+          tags: ${{ secrets.username }}/tp-devops-simple-api-httpd:latest
