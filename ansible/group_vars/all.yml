@@ -1,0 +1,22 @@
+# Réseau docker
+network_name: app-network
+
+# Images (depuis Docker Hub)
+db_image: "{{ lookup('env', 'DOCKERHUB_USERNAME') | default('user') }}/tp-devops-database:latest"
+app_image: "{{ lookup('env', 'DOCKERHUB_USERNAME') | default('user') }}/tp-devops-simple-api:latest"
+proxy_image: "{{ lookup('env', 'DOCKERHUB_USERNAME') | default('user') }}/tp-devops-httpd:latest"
+
+# DB creds
+db_name: db
+db_user: usr
+db_password: pwd
+db_port: 5432
+db_volume: pgdata
+
+# Backend env
+spring_jdbc_url: "jdbc:postgresql://database:{{ db_port }}/{{ db_name }}"
+spring_jdbc_user: "{{ db_user }}"
+spring_jdbc_password: "{{ db_password }}"
+
+# Publication proxy
+proxy_http_port: 80

@@ -31,15 +31,15 @@ jobs:
               -Dmaven.wagon.http.retryHandler.count=3 \
               -Dmaven.wagon.http.connectionManager.ttl=60 \
               -Dmaven.wagon.http.pool=false && break || {
-                echo "⚠️ Maven attempt $i failed; retrying in 10s..."; sleep 10;
+                echo "Maven attempt $i failed; retrying in 10s..."; sleep 10;
               }
           done
 
       # Vérif du token Sonar
       - name: Check Sonar token presence
         run: |
-          test -n "${{ secrets.pwdsonar }}" || (echo "❌ Missing Sonar token (secrets.pwdsonar)" && exit 1)
-          echo "✅ SONAR token detected."
+          test -n "${{ secrets.pwdsonar }}" || (echo " Missing Sonar token (secrets.pwdsonar)" && exit 1)
+          echo " SONAR token detected."
 
       # Analyse SonarCloud (debug)
       - name: SonarCloud analysis (debug)
@@ -48,7 +48,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.pwdsonar }}
         run: |
           set -euo pipefail
-          # ⚠️ Mets exactement les valeurs de ton organisation/projet SonarCloud
           SONAR_ORG="brendakoundjo"
           SONAR_PROJECT="BrendaKoundjo_Devops"
 
@@ -68,7 +67,7 @@ jobs:
   build-and-push-docker-image:
     needs: test-backend
     runs-on: ubuntu-24.04
-    # Évite de pousser des images depuis une PR de fork (secrets non transmis par GitHub)
+    # pour eviter de pousser des images depuis une PR de fork (secrets non transmis par GitHub)
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
 
     steps:
@@ -80,9 +79,9 @@ jobs:
 
       - name: Check DockerHub secrets presence
         run: |
-          test -n "${{ secrets.username }}"    || (echo "❌ Missing Docker username (secrets.username)" && exit 1)
-          test -n "${{ secrets.coursdevops }}" || (echo "❌ Missing Docker token (secrets.coursdevops)" && exit 1)
-          echo "✅ Docker secrets detected."
+          test -n "${{ secrets.username }}"    || (echo " Missing Docker username (secrets.username)" && exit 1)
+          test -n "${{ secrets.coursdevops }}" || (echo " Missing Docker token (secrets.coursdevops)" && exit 1)
+          echo " Docker secrets detected."
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -97,7 +96,7 @@ jobs:
           context: ./myapp
           dockerfile: ./myapp/Dockerfile
           push: true
-          # ⚠️ le namespace doit être exactement ton username Docker Hub (tout en minuscules)
+          # le namespace doit être exactement ton username Docker Hub (tout en minuscules)
           tags: ${{ secrets.username }}/tp-devops-simple-api-backend:latest
 
       # Database image (facultatif, seulement si le Dockerfile existe)

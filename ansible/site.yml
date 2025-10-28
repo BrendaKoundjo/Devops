@@ -1,0 +1,232 @@
+- hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    distro_l: "{{ ansible_distribution | lower }}"
+    release_codename: "{{ ansible_distribution_release }}"
+    docker_arch: >-
+      {{ 'amd64' if ansible_architecture == 'x86_64'
+         else 'arm64' if ansible_architecture in ['aarch64','arm64']
+         else ansible_architecture }}
+
+    network_name: app-network
+    proxy_http_port: 80
+
+    db_image: "brendaaudrey/tp-devops-simple-api-database"     # ajoute un :tag si besoin
+    app_image: "brendaaudrey/tp-devops-simple-api-backend"      # ajoute un :tag si besoin
+    proxy_image: "brendaaudrey/tp-devops-simple-api-httpd"      # ex: :1.0 si pas de latest
+    adminer_image: "adminer"
+
+    db_name: db
+    db_user: usr
+    db_password: pwd
+    db_port: 5432
+    db_volume: pgdata
+
+    spring_jdbc_url: "jdbc:postgresql://database:5432/db"
+    spring_jdbc_user: "{{ db_user }}"
+    spring_jdbc_password: "{{ db_password }}"
+
+    docker_ansible_python: /usr/bin/python3
+
+  tasks:
+    # ---------- Install Docker ----------
+    - name: Update APT cache & base deps
+      ansible.builtin.apt:
+        update_cache: yes
+        name: [ca-certificates, curl, gnupg]
+      tags: [docker_install]
+
+    - name: Ensure keyrings dir exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      tags: [docker_install]
+
+    - name: Add Docker GPG key
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ distro_l }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+        force: yes
+      tags: [docker_install]
+
+    - name: Add Docker APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/{{ distro_l }} {{ release_codename }} stable"
+        filename: docker
+        state: present
+      tags: [docker_install]
+
+    - name: Update apt cache after repo add
+      ansible.builtin.apt:
+        update_cache: yes
+      tags: [docker_install]
+
+    - name: Install Docker Engine & plugins
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+      tags: [docker_install]
+
+    - name: Ensure Docker running and enabled
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      tags: [docker_install, docker]
+
+    - name: Install Python Docker & requests (APT)
+      ansible.builtin.apt:
+        name:
+          - python3-docker
+          - python3-requests
+          - python3-requests-unixsocket
+        state: present
+      tags: [docker_install]
+
+    # ---------- Network ----------
+    - name: Create application network
+      community.docker.docker_network:
+        name: "{{ network_name }}"
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [create_network, network]
+
+    # ---------- Database ----------
+    - name: Create Postgres data volume
+      community.docker.docker_volume:
+        name: "{{ db_volume }}"
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [launch_database, database]
+
+    - name: Run database container (PostgreSQL)
+      community.docker.docker_container:
+        name: database
+        image: "{{ db_image }}"
+        pull: yes
+        restart_policy: unless-stopped
+        env:
+          POSTGRES_DB: "{{ db_name }}"
+          POSTGRES_USER: "{{ db_user }}"
+          POSTGRES_PASSWORD: "{{ db_password }}"
+        # Postgres 18+ -> monter /var/lib/postgresql (pas .../data)
+        volumes:
+          - "{{ db_volume }}:/var/lib/postgresql"
+        networks:
+          - name: "{{ network_name }}"
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U {{ db_user }} -d {{ db_name }}"]
+          interval: 10s
+          timeout: 10s
+          retries: 10
+          start_period: 30s
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [launch_database, database]
+
+    - name: Wait for database to accept connections (docker exec pg_isready)
+      ansible.builtin.shell: |
+        docker exec database pg_isready -U {{ db_user }} -d {{ db_name }}
+      register: db_ready
+      changed_when: false
+      failed_when: false
+      retries: 30
+      delay: 2
+      until: db_ready.rc == 0
+      tags: [launch_database, database]
+
+    # ---------- Backend ----------
+    - name: Run backend container (Spring Boot)
+      community.docker.docker_container:
+        name: backend
+        image: "{{ app_image }}"
+        pull: yes
+        restart_policy: unless-stopped
+        env:
+          SPRING_DATASOURCE_URL: "{{ spring_jdbc_url }}"
+          SPRING_DATASOURCE_USERNAME: "{{ spring_jdbc_user }}"
+          SPRING_DATASOURCE_PASSWORD: "{{ spring_jdbc_password }}"
+        networks:
+          - name: "{{ network_name }}"
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [launch_app, app]
+
+    - name: Give backend a few seconds to start
+      ansible.builtin.wait_for:
+        timeout: 10
+      tags: [launch_app, app]
+
+    # ---------- Proxy (httpd) ----------
+    - name: Create httpd config dir on host
+      ansible.builtin.file:
+        path: /opt/httpd
+        state: directory
+        mode: '0755'
+      tags: [launch_proxy, proxy]
+
+    - name: Deploy reverse-proxy.conf (VirtualHost → backend:8080)
+      ansible.builtin.copy:
+        dest: /opt/httpd/reverse-proxy.conf
+        mode: '0644'
+        content: |
+          <IfModule !proxy_module>
+            LoadModule proxy_module modules/mod_proxy.so
+          </IfModule>
+          <IfModule !proxy_http_module>
+            LoadModule proxy_http_module modules/mod_proxy_http.so
+          </IfModule>
+
+          <VirtualHost *:80>
+            ProxyPreserveHost On
+            ProxyPass        / http://backend:8080/
+            ProxyPassReverse / http://backend:8080/
+            ErrorLog  /usr/local/apache2/logs/error.log
+            CustomLog /usr/local/apache2/logs/access.log combined
+          </VirtualHost>
+      tags: [launch_proxy, proxy]
+
+    - name: Remove previous httpd (clear wrong mounts if any)
+      community.docker.docker_container:
+        name: httpd
+        state: absent
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [launch_proxy, proxy]
+
+    - name: Run httpd (reverse proxy) with extra include
+      community.docker.docker_container:
+        name: httpd
+        image: "{{ proxy_image }}"
+        pull: yes
+        restart_policy: unless-stopped
+        published_ports:
+          - "{{ proxy_http_port }}:80"
+        volumes:
+          - /opt/httpd/reverse-proxy.conf:/usr/local/apache2/conf/extra/reverse-proxy.conf:ro
+        command:
+          - "httpd-foreground"
+          - "-C"
+          - "Include conf/extra/reverse-proxy.conf"
+        networks:
+          - name: "{{ network_name }}"
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [launch_proxy, proxy]
+
+    # ---------- Adminer (optionnel) ----------
+    - name: Run adminer (UI DB)
+      community.docker.docker_container:
+        name: adminer
+        image: "{{ adminer_image }}"
+        pull: yes
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ network_name }}"
+        published_ports:
+          - "8090:8080"
+      vars: { ansible_python_interpreter: "{{ docker_ansible_python }}" }
+      tags: [adminer]

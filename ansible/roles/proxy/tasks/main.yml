@@ -1,0 +1,36 @@
+- name: Create config dir on host
+  ansible.builtin.file:
+    path: /opt/httpd
+    state: directory
+    mode: '0755'
+
+- name: Deploy httpd.conf
+  ansible.builtin.template:
+    src: httpd.conf.j2
+    dest: /opt/httpd/httpd.conf
+    mode: '0644'
+  notify: Restart httpd
+
+- name: Run proxy (httpd)
+  community.docker.docker_container:
+    name: httpd
+    image: "{{ proxy_image }}"
+    pull: yes
+    restart_policy: unless-stopped
+    published_ports:
+      - "{{ proxy_http_port }}:80"
+    volumes:
+      - /opt/httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    networks:
+      - name: "{{ network_name }}"
+    depends_on:
+      - backend
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+# Handlers
+- name: Restart httpd
+  ansible.builtin.service:
+    name: docker
+    state: started
+  listen: Restart httpd

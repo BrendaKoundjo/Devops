@@ -1,0 +1,19 @@
+ansible/
+├─ inventories/
+│  └─ setup.yml
+├─ group_vars/
+│  └─ all.yml
+├─ roles/
+│  ├─ docker-install/
+│  │  └─ tasks/main.yml
+│  ├─ network/
+│  │  └─ tasks/main.yml
+│  ├─ database/
+│  │  ├─ tasks/main.yml
+│  │  └─ templates/ (si tu veux gérer des SQL init)
+│  ├─ app/
+│  │  └─ tasks/main.yml
+│  └─ proxy/
+│     ├─ tasks/main.yml
+│     └─ templates/httpd.conf.j2
+└─ site.yml

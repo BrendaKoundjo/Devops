@@ -1,0 +1,5 @@
+- name: Create application network
+  community.docker.docker_network:
+    name: "{{ network_name }}"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3

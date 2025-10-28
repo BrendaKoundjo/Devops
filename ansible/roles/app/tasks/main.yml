@@ -1,0 +1,16 @@
+- name: Run backend container
+  community.docker.docker_container:
+    name: backend
+    image: "{{ app_image }}"
+    pull: yes
+    restart_policy: unless-stopped
+    env:
+      SPRING_DATASOURCE_URL: "{{ spring_jdbc_url }}"
+      SPRING_DATASOURCE_USERNAME: "{{ spring_jdbc_user }}"
+      SPRING_DATASOURCE_PASSWORD: "{{ spring_jdbc_password }}"
+    networks:
+      - name: "{{ network_name }}"
+    depends_on:
+      - database
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
