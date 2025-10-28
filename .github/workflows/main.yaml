@@ -7,9 +7,9 @@ on:
     branches: [dev, main]
 
 jobs:
+  # -------------------- CI : build + tests + sonar --------------------
   test-backend:
     runs-on: ubuntu-24.04
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # Build + tests (avec retry réseau pour Maven Central)
+      # Build + tests (avec retry Maven Central)
       - name: Build and test with Maven (retry)
         working-directory: myapp
         run: |
@@ -35,13 +35,11 @@ jobs:
               }
           done
 
-      # Vérif du token Sonar
       - name: Check Sonar token presence
         run: |
           test -n "${{ secrets.pwdsonar }}" || (echo " Missing Sonar token (secrets.pwdsonar)" && exit 1)
           echo " SONAR token detected."
 
-      # Analyse SonarCloud (debug)
       - name: SonarCloud analysis (debug)
         working-directory: myapp
         env:
@@ -50,11 +48,8 @@ jobs:
           set -euo pipefail
           SONAR_ORG="brendakoundjo"
           SONAR_PROJECT="BrendaKoundjo_Devops"
-
           java -version || true
           mvn -version || true
-
-          # Le bytecode est déjà produit par 'clean verify' ci-dessus
           mvn -B -e -X sonar:sonar \
             -Dsonar.organization="$SONAR_ORG" \
             -Dsonar.projectKey="$SONAR_PROJECT" \
@@ -64,11 +59,17 @@ jobs:
             -Dsonar.sources=src/main \
             -Dsonar.tests=src/test
 
+  # -------------------- Build & Push docker images --------------------
   build-and-push-docker-image:
     needs: test-backend
     runs-on: ubuntu-24.04
-    # pour eviter de pousser des images depuis une PR de fork (secrets non transmis par GitHub)
+    # éviter un push depuis PR de fork (secrets non transmis)
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+
+    outputs:
+      backend_digest: ${{ steps.build_backend.outputs.digest }}
+      httpd_digest:   ${{ steps.build_httpd.outputs.digest }}
+      db_digest:      ${{ steps.build_db.outputs.digest }}
 
     steps:
       - name: Checkout code
@@ -91,16 +92,18 @@ jobs:
 
       # Backend image (Dockerfile dans myapp/)
       - name: Build and push backend image
+        id: build_backend
         uses: docker/build-push-action@v6
         with:
           context: ./myapp
           dockerfile: ./myapp/Dockerfile
           push: true
-          # le namespace doit être exactement ton username Docker Hub (tout en minuscules)
           tags: ${{ secrets.username }}/tp-devops-simple-api-backend:latest
+          provenance: false
 
-      # Database image (facultatif, seulement si le Dockerfile existe)
+      # Database image (facultatif)
       - name: Build and push database image
+        id: build_db
         if: ${{ hashFiles('db/Dockerfile') != '' }}
         uses: docker/build-push-action@v6
         with:
@@ -108,9 +111,11 @@ jobs:
           dockerfile: ./db/Dockerfile
           push: true
           tags: ${{ secrets.username }}/tp-devops-simple-api-database:latest
+          provenance: false
 
-      # HTTPD image (facultatif, seulement si le Dockerfile existe)
+      # HTTPD image (facultatif)
       - name: Build and push httpd image
+        id: build_httpd
         if: ${{ hashFiles('httpd/Dockerfile') != '' }}
         uses: docker/build-push-action@v6
         with:
@@ -118,3 +123,61 @@ jobs:
           dockerfile: ./httpd/Dockerfile
           push: true
           tags: ${{ secrets.username }}/tp-devops-simple-api-httpd:latest
+          provenance: false
+
+  deploy:
+    needs: build-and-push-docker-image
+    runs-on: ubuntu-24.04
+    # Déploie seulement depuis main
+    if: ${{ github.ref == 'refs/heads/main' }}
+    # (Optionnel) Approval via Environment
+    environment:
+      name: production
+      url: http://brendaaudrey.koundjonguepkap.takima.cloud
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ansible & SSH client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible openssh-client
+
+      - name: Write SSH key
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_deploy
+          printf "%s" "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+          {
+            echo "Host *"
+            echo "  StrictHostKeyChecking no"
+          } > ~/.ssh/config
+
+      - name: Deploy with Ansible (pin images by digest)
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          # Compose les références par digest si dispo, sinon fallback :latest
+          APP_IMG="${{ secrets.username }}/tp-devops-simple-api-backend@${{ needs.build-and-push-docker-image.outputs.backend_digest }}"
+          HTTPD_IMG="${{ secrets.username }}/tp-devops-simple-api-httpd@${{ needs.build-and-push-docker-image.outputs.httpd_digest }}"
+          DB_IMG="${{ secrets.username }}/tp-devops-simple-api-database@${{ needs.build-and-push-docker-image.outputs.db_digest }}"
+
+          if [ -z "${{ needs.build-and-push-docker-image.outputs.backend_digest }}" ]; then
+            APP_IMG="${{ secrets.username }}/tp-devops-simple-api-backend:latest"
+          fi
+          if [ -z "${{ needs.build-and-push-docker-image.outputs.httpd_digest }}" ]; then
+            HTTPD_IMG="${{ secrets.username }}/tp-devops-simple-api-httpd:latest"
+          fi
+          if [ -z "${{ needs.build-and-push-docker-image.outputs.db_digest }}" ]; then
+            DB_IMG="${{ secrets.username }}/tp-devops-simple-api-database:latest"
+          fi
+
+          echo "Deploying with:"
+          echo "  backend: ${APP_IMG}"
+          echo "  httpd:   ${HTTPD_IMG}"
+          echo "  db:      ${DB_IMG}"
+
+          ansible-playbook -i ansible/inventories/setup.yml ansible/site.yml \
+            --user admin \
+            --private-key ~/.ssh/id_deploy \
+            --extra-vars "app_image=${APP_IMG} proxy_image=${HTTPD_IMG} db_image=${DB_IMG}"
