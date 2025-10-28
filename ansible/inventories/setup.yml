@@ -1,7 +1,7 @@
 all:
  vars:
    ansible_user: admin
-   ansible_ssh_private_key_file: /home/koundjo/Documents/EPF-COURS/devops/TP3/id_rsa
+   ansible_ssh_private_key_file: /home/koundjo/Documents/EPF-COURS/devops/TP3/ansible/site.yml
  children:
    prod:
      hosts:  brendaaudrey.koundjonguepkap.takima.cloud
